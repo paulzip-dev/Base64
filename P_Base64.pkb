@@ -1,13 +1,18 @@
 create or replace package body P_Base64 is
 
 /*
-An input chunk size of 23760 converts to 32668 output in Base64, 23760 is modulo
-divisible by 48 and 3 which means content will be full lines including CRLF
-endings, as it doesn't exceed 327676 it also allows space for us to add a
-concatenating CRLF between chunks
+MAX_ENC_CHUNK_LEN : An input chunk size of 23760 converts to 32668 output in
+Base64, 23760 is modulo divisible by 48 and 3 (with no remainder) which means
+content will be full lines including CRLF endings, as it doesn't exceed 327676
+it also allows space for us to add a concatenating CRLF between chunks
+
+MAX_DEC_CHUNK_LEN : Has to be modulo divisible (with no remainder) for each of :
+ 4 - as encoding is 4 * 6 bit bytes chunks,
+64 - as a terminating line is 64 bytes and without CRLF
+66 - as a non terminating line is 64 bytes + CRLF
 */
-MAX_ENC_CHUNK_LEN constant pls_integer := 23760;
-MAX_DEC_CHUNK_LEN constant pls_integer := 32764;  -- Divisible by 4
+MAX_ENC_CHUNK_LEN constant pls_integer := 23760; -- Don't change!!
+MAX_DEC_CHUNK_LEN constant pls_integer := 14784; -- Don't change!!
 CRLF varchar2(2) := chr(13) || chr(10);
 
 --------------------------------------------------------------------------------
