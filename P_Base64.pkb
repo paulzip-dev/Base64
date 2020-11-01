@@ -3,7 +3,7 @@ create or replace package body P_Base64 is
 /*
 MAX_ENC_CHUNK_LEN : An input chunk size of 23760 converts to 32668 output in
 Base64, 23760 is modulo divisible by 48 and 3 (with no remainder) which means
-content will be full lines including CRLF endings, as it doesn't exceed 327676
+content will be full lines including CRLF endings, as it doesn't exceed 32767
 it also allows space for us to add a concatenating CRLF between chunks
 
 MAX_DEC_CHUNK_LEN : Has to be modulo divisible (with no remainder) for each of :
@@ -14,17 +14,12 @@ MAX_DEC_CHUNK_LEN : Has to be modulo divisible (with no remainder) for each of :
 MAX_ENC_CHUNK_LEN constant pls_integer := 23760; -- Don't change!!
 MAX_DEC_CHUNK_LEN constant pls_integer := 14784; -- Don't change!!
 CRLF varchar2(2) := chr(13) || chr(10);
+WHITESPACE varchar2(6) := ' ' || CRLF || chr(9) || chr(11) || chr(12); -- Whitespace : 32 (Space), 13 (Carriage Return), 10 (Line Feed), 9 (Horizontal Tab), 11 (Vertical Tab), 12 (Form Feed)
 
 --------------------------------------------------------------------------------
 
---function EncodeRawToRaw(pIP raw) return raw is
---begin
---  return case
---           when pIP is not null then utl_encode.base64_encode(pIP)
---         end;
---end;
-
 function EncodeRaw(pIP raw) return varchar2 is
+-- Encodes a raw input of bytes into a Base64 string
 begin
   return case
            when pIP is not null then utl_raw.cast_to_varchar2(utl_encode.base64_encode(pIP))
@@ -32,11 +27,13 @@ begin
 end;
 
 function EncodeString(pIP varchar2) return varchar2 is
+-- Encodes a string into a Base64 string
 begin
   return EncodeRaw(utl_raw.cast_to_raw(pIP));
 end;
 
 function EncodeClob(pIP clob) return clob is
+-- Encodes a clob into a Base64 clob
   vLen pls_integer := coalesce(dbms_lob.getlength(pIP), 0);
   vChunk varchar2(32767);
   vResult clob;
@@ -58,6 +55,7 @@ begin
 end;
 
 function EncodeBlob(pIP blob) return clob is
+-- Encodes a blob into a Base64 clob
   vLen pls_integer := coalesce(dbms_lob.getlength(pIP), 0);
   vChunk varchar2(32767);
   vResult clob;
@@ -79,6 +77,7 @@ begin
 end;
 
 function EncodeBFile(pIP in out BFile) return clob is
+-- Encodes a BFile's content into a Base64 clob
   vLen pls_integer := coalesce(dbms_lob.getlength(pIP), 0);
   vChunk varchar2(32767);
   vResult clob;
@@ -114,6 +113,7 @@ begin
 end;
 
 function EncodeFile(pOraDir varchar2, pFilename varchar2) return clob is
+-- Encodes the content of a file in an Oracle directory into a Base64 clob
   vBFilename BFile;
 begin
   vBFilename := BFilename(pOraDir, pFilename);
@@ -123,18 +123,21 @@ end;
 --------------------------------------------------------------------------------
 
 function DecodeToRaw(pIP varchar2) return raw is
+-- Decodes a Base64 encoded string into raw bytes (max 32k bytes)
 begin
   return case
-           when pIP is not null then utl_encode.base64_decode(utl_raw.cast_to_raw(translate(pIP, 'a'||chr(13)||chr(10), 'a')))  -- Translate here removes CR and LFs
+           when pIP is not null then utl_encode.base64_decode(utl_raw.cast_to_raw(translate(pIP, 'a'||WHITESPACE, 'a')))  -- Translate here removes whitespace
          end;
 end;
 
 function DecodeToString(pIP varchar2) return varchar2 is
+-- Decodes a Base64 encoded string into a varchar2 string (max 32k bytes)
 begin
   return utl_raw.cast_to_varchar2(DecodeToRaw(pIP));
 end;
 
 function DecodeToClob(pIP clob) return clob is
+-- Decodes a Base64 encoded clob into a clob
   vLen pls_integer := coalesce(dbms_lob.getlength(pIP), 0);
   vBufferVarchar2 varchar2(32767 byte);
   vBufferSize integer := MAX_DEC_CHUNK_LEN;
@@ -160,6 +163,7 @@ begin
 end;
 
 function DecodeToBlob(pIP clob) return blob is
+-- Decodes a Base64 encoded clob into a blob
   vLen pls_integer := coalesce(dbms_lob.getlength(pIP), 0);
   vBufferRaw raw(32767);
   vBufferVarchar2 varchar2(32767 byte);
@@ -186,6 +190,7 @@ begin
 end;
 
 procedure DecodeToFile(pIP clob, pOraDir varchar2, pFilename varchar2) is
+-- Decodes a Base64 encoded clob, saving it into a file in the Oracle directory
   vLen pls_integer;
   vFile utl_file.file_type;
   vBuffer varchar2(32767);
