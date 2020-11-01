@@ -7,6 +7,10 @@ Oracle's provides some Base64 routines in UTL_ENCODE, but these will only proces
 * Support for sizes above 32KB
 * Support for files
 
+## How to Install :
+
+Compile package spec **P_Base64.pks** and package body **P_Base64.pkb**
+
 ## Base64 Encoding routines :
 
 Function / Procedure | Operation 
