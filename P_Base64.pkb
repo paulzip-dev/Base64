@@ -47,7 +47,7 @@ begin
       dbms_lob.createtemporary(vResult, true, dbms_lob.call);
       for i in 0..trunc((vLen - 1) / MAX_ENC_CHUNK_LEN)
       loop
-        vChunk := case when i > 0 then CRLF end || EncodeString(dbms_lob.substr(pIP, MAX_ENC_CHUNK_LEN, i * MAX_ENC_CHUNK_LEN + 1));
+        vChunk := /*case when i > 0 then CRLF end || */EncodeString(dbms_lob.substr(pIP, MAX_ENC_CHUNK_LEN, i * MAX_ENC_CHUNK_LEN + 1));
         dbms_lob.writeappend(vResult, length(vChunk), vChunk);
       end loop;
   end case;
@@ -69,7 +69,7 @@ begin
       dbms_lob.createtemporary(vResult, true, dbms_lob.call);
       for i in 0..trunc((vLen - 1) / MAX_ENC_CHUNK_LEN)
       loop
-        vChunk := case when i > 0 then CRLF end || EncodeRaw(dbms_lob.substr(pIP, MAX_ENC_CHUNK_LEN, i * MAX_ENC_CHUNK_LEN + 1));
+        vChunk := /*case when i > 0 then CRLF end || */EncodeRaw(dbms_lob.substr(pIP, MAX_ENC_CHUNK_LEN, i * MAX_ENC_CHUNK_LEN + 1));
         dbms_lob.writeappend(vResult, length(vChunk), vChunk);
       end loop;
   end case;
