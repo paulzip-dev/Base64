@@ -1,4 +1,4 @@
-# Base64 Encoding and Decoding Routines Package
+# Base64 Encoding and Decoding Routines PL/SQL Package for Oracle
 
 Base64 is a group of binary-to-text encoding schemes that represent binary data in an ASCII string format by translating it into a radix-64 representation.  Base64 encoding is typically used to carry data stored in binary formats across channels that only reliably support text content.
 
