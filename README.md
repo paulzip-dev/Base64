@@ -23,9 +23,10 @@ Function / Procedure | Operation
 `function  EncodeFile  (pOraDir varchar2, pFilename varchar2, pLineSeparators TFlag default 1) return clob;` | Encodes the contents of a file into a Base64 clob.
 
 Note:
+
 The pLineSeparators parameter controls whether or not CRLF line separators are included every 64 encoded chars
-pLineSeparators = 0 : All CRLF line separators are removed from encoded data
-pLineSeparators = 1 : CRLF line separators are included every 64 encoded chars
+* pLineSeparators = 0 : All CRLF line separators are removed from encoded data
+* pLineSeparators = 1 (Default) : CRLF line separators are included every 64 encoded chars
 
 
 ## Base64 Decoding routines :
