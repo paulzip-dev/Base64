@@ -13,18 +13,24 @@ Compile package spec **P_Base64.pks** and package body **P_Base64.pkb**
 
 ## Base64 Encoding routines :
 
-Function / Procedure | Operation 
+Function / Procedure | Operation
 --------------------------------------------------------|----------------------------------------------------------------
-`function  EncodeString(pIP varchar2) return varchar2;` | Encodes a varchar2 string into a Base64 varchar2 string, limited to 32KB.
-`function  EncodeRaw   (pIP raw) return varchar2;` | Encodes a raw bytes input into a Base64 varchar2 string, limited to 32KB.
-`function  EncodeClob  (pIP clob) return clob;` | Encodes a clob input into a Base64 clob.
-`function  EncodeBlob  (pIP blob) return clob;` | Encodes a blob input into a Base64 clob.
-`function  EncodeBFile (pIP in out BFile) return clob;` | Encodes a bfile input into a Base64 clob.
-`function  EncodeFile  (pOraDir varchar2, pFilename varchar2) return clob;` | Encodes the contents of a file into a Base64 clob.
+`function  EncodeString(pIP varchar2, pLineSeparators TFlag default 1) return varchar2;` | Encodes a varchar2 string into a Base64 varchar2 string, limited to 32KB.
+`function  EncodeRaw   (pIP raw, pLineSeparators TFlag default 1) return varchar2;` | Encodes a raw bytes input into a Base64 varchar2 string, limited to 32KB.
+`function  EncodeClob  (pIP clob, pLineSeparators TFlag default 1) return clob;` | Encodes a clob input into a Base64 clob.
+`function  EncodeBlob  (pIP blob, pLineSeparators TFlag default 1) return clob;` | Encodes a blob input into a Base64 clob.
+`function  EncodeBFile (pIP in out BFile, pLineSeparators TFlag default 1) return clob;` | Encodes a bfile input into a Base64 clob.
+`function  EncodeFile  (pOraDir varchar2, pFilename varchar2, pLineSeparators TFlag default 1) return clob;` | Encodes the contents of a file into a Base64 clob.
+
+Note:
+The pLineSeparators parameter controls whether or not CRLF line separators are included every 64 encoded chars
+pLineSeparators = 0 : All CRLF line separators are removed from encoded data
+pLineSeparators = 1 : CRLF line separators are included every 64 encoded chars
+
 
 ## Base64 Decoding routines :
 
-Function / Procedure | Operation 
+Function / Procedure | Operation
 --------------------------------------------------------|----------------------------------------------------------------
 `function  DecodeToRaw   (pIP varchar2) return raw;` | Decodes a Base64 encoded string into raw bytes, limited to 32k
 `function  DecodeToString(pIP varchar2) return varchar2;` | Decodes a Base64 encoded string into a varchar2 string, limited to 32k
