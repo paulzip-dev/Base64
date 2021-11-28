@@ -11,12 +11,14 @@ into 48 bytes lines. Oracle adds a carriage return + line feed pair (CRLF)
 between each of these.
 */
 
-function  EncodeString(pIP varchar2) return varchar2;
-function  EncodeRaw   (pIP raw) return varchar2;
-function  EncodeClob  (pIP clob) return clob;
-function  EncodeBlob  (pIP blob) return clob;
-function  EncodeBFile (pIP in out BFile) return clob;
-function  EncodeFile  (pOraDir varchar2, pFilename varchar2) return clob;
+subtype TFlag is pls_integer range 0..1;
+
+function  EncodeString(pIP varchar2, pLineSeparators TFlag default 1) return varchar2;
+function  EncodeRaw   (pIP raw, pLineSeparators TFlag default 1) return varchar2;
+function  EncodeClob  (pIP clob, pLineSeparators TFlag default 1) return clob;
+function  EncodeBlob  (pIP blob, pLineSeparators TFlag default 1) return clob;
+function  EncodeBFile (pIP in out BFile, pLineSeparators TFlag default 1) return clob;
+function  EncodeFile  (pOraDir varchar2, pFilename varchar2, pLineSeparators TFlag default 1) return clob;
 
 function  DecodeToRaw   (pIP varchar2) return raw;
 function  DecodeToString(pIP varchar2) return varchar2;

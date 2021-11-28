@@ -18,68 +18,79 @@ WHITESPACE varchar2(6) := ' ' || CRLF || chr(9) || chr(11) || chr(12); -- Whites
 
 --------------------------------------------------------------------------------
 
-function EncodeRaw(pIP raw) return varchar2 is
+function EncodeRaw(pIP raw, pLineSeparators TFlag default 1) return varchar2 is
 -- Encodes a raw input of bytes into a Base64 string
+-- If pLineSeparators = 0 then any CRLFs will be removed from encoded content
 begin
   return case
-           when pIP is not null then utl_raw.cast_to_varchar2(utl_encode.base64_encode(pIP))
+           when pIP is null then null
+           when pLineSeparators = 0 then replace(utl_raw.cast_to_varchar2(utl_encode.base64_encode(pIP)), CRLF, '')  -- Remove line separators that Oracle adds, replace is faster than translate
+           else utl_raw.cast_to_varchar2(utl_encode.base64_encode(pIP))
          end;
 end;
 
-function EncodeString(pIP varchar2) return varchar2 is
+function EncodeString(pIP varchar2, pLineSeparators TFlag default 1) return varchar2 is
 -- Encodes a string into a Base64 string
 begin
-  return EncodeRaw(utl_raw.cast_to_raw(pIP));
+  return EncodeRaw(utl_raw.cast_to_raw(pIP), pLineSeparators);
 end;
 
-function EncodeClob(pIP clob) return clob is
+function EncodeClob(pIP clob, pLineSeparators TFlag default 1) return clob is
 -- Encodes a clob into a Base64 clob
+  vOffset integer := 1;
   vLen pls_integer := coalesce(dbms_lob.getlength(pIP), 0);
   vChunk varchar2(32767);
+  vLineSep varchar2(2) := case when pLineSeparators = 0 then null else CRLF end;
   vResult clob;
 begin
   case
     when vLen = 0 then
       vResult := pIP;
     when vLen <= MAX_ENC_CHUNK_LEN then
-      vResult := EncodeString(pIP);
+      vResult := EncodeString(pIP, pLineSeparators);
     else
       dbms_lob.createtemporary(vResult, true, dbms_lob.call);
-      for i in 0..trunc((vLen - 1) / MAX_ENC_CHUNK_LEN)
+      for i in 1..ceil(vLen / MAX_ENC_CHUNK_LEN)
       loop
-        vChunk := case when i > 0 then CRLF end || EncodeString(dbms_lob.substr(pIP, MAX_ENC_CHUNK_LEN, i * MAX_ENC_CHUNK_LEN + 1));
+        vChunk := case when i > 1 then vLineSep end || EncodeString(dbms_lob.substr(pIP, MAX_ENC_CHUNK_LEN, vOffset), pLineSeparators);
         dbms_lob.writeappend(vResult, length(vChunk), vChunk);
+        vOffset := vOffset + MAX_ENC_CHUNK_LEN;
       end loop;
   end case;
   return vResult;
 end;
 
-function EncodeBlob(pIP blob) return clob is
+function EncodeBlob(pIP blob, pLineSeparators TFlag default 1) return clob is
 -- Encodes a blob into a Base64 clob
+  vOffset integer := 1;
   vLen pls_integer := coalesce(dbms_lob.getlength(pIP), 0);
   vChunk varchar2(32767);
+  vLineSep varchar2(2) := case when pLineSeparators = 0 then null else CRLF end;
   vResult clob;
 begin
   case
     when vLen = 0 then
       vResult := case when pIP is null then null else empty_clob() end;
     when vLen <= MAX_ENC_CHUNK_LEN then
-      vResult := EncodeRaw(pIP);
+      vResult := EncodeRaw(pIP, pLineSeparators);
     else
       dbms_lob.createtemporary(vResult, true, dbms_lob.call);
-      for i in 0..trunc((vLen - 1) / MAX_ENC_CHUNK_LEN)
+      for i in 1..ceil(vLen / MAX_ENC_CHUNK_LEN)
       loop
-        vChunk := case when i > 0 then CRLF end || EncodeRaw(dbms_lob.substr(pIP, MAX_ENC_CHUNK_LEN, i * MAX_ENC_CHUNK_LEN + 1));
+        vChunk := case when i > 1 then vLineSep end || EncodeRaw(dbms_lob.substr(pIP, MAX_ENC_CHUNK_LEN, vOffset), pLineSeparators);
         dbms_lob.writeappend(vResult, length(vChunk), vChunk);
+        vOffset := vOffset + MAX_ENC_CHUNK_LEN;
       end loop;
   end case;
   return vResult;
 end;
 
-function EncodeBFile(pIP in out BFile) return clob is
+function EncodeBFile(pIP in out BFile, pLineSeparators TFlag default 1) return clob is
 -- Encodes a BFile's content into a Base64 clob
+  vOffset integer := 1;
   vLen pls_integer := coalesce(dbms_lob.getlength(pIP), 0);
   vChunk varchar2(32767);
+  vLineSep varchar2(2) := case when pLineSeparators = 0 then null else CRLF end;
   vResult clob;
 begin
   if dbms_lob.isopen(pIP) = 0 then
@@ -90,13 +101,14 @@ begin
       when vLen = 0 then
         null;
       when vLen <= MAX_ENC_CHUNK_LEN then
-        vResult := EncodeRaw(dbms_lob.substr(pIP, vLen, 1));
+        vResult := EncodeRaw(dbms_lob.substr(pIP, vLen, 1), pLineSeparators);
       else
         dbms_lob.createtemporary(vResult, true, dbms_lob.call);
-        for i in 0..trunc((vLen - 1) / MAX_ENC_CHUNK_LEN)
+        for i in 1..ceil(vLen / MAX_ENC_CHUNK_LEN)
         loop
-          vChunk := case when i > 0 then CRLF end || EncodeRaw(dbms_lob.substr(pIP, MAX_ENC_CHUNK_LEN, i * MAX_ENC_CHUNK_LEN + 1));
+          vChunk := case when i > 1 then vLineSep end || EncodeRaw(dbms_lob.substr(pIP, MAX_ENC_CHUNK_LEN, vOffset), pLineSeparators);
           dbms_lob.writeappend(vResult, length(vChunk), vChunk);
+          vOffset := vOffset + MAX_ENC_CHUNK_LEN;
         end loop;
     end case;
     if dbms_lob.isopen(pIP) = 1 then
@@ -112,12 +124,12 @@ begin
   return vResult;
 end;
 
-function EncodeFile(pOraDir varchar2, pFilename varchar2) return clob is
+function EncodeFile(pOraDir varchar2, pFilename varchar2, pLineSeparators TFlag default 1) return clob is
 -- Encodes the content of a file in an Oracle directory into a Base64 clob
   vBFilename BFile;
 begin
   vBFilename := BFilename(pOraDir, pFilename);
-  return EncodeBFile(vBFilename);
+  return EncodeBFile(vBFilename, pLineSeparators);
 end;
 
 --------------------------------------------------------------------------------
@@ -138,10 +150,10 @@ end;
 
 function DecodeToClob(pIP clob) return clob is
 -- Decodes a Base64 encoded clob into a clob
+  vOffset integer := 1;
   vLen pls_integer := coalesce(dbms_lob.getlength(pIP), 0);
   vBufferVarchar2 varchar2(32767 byte);
   vBufferSize integer := MAX_DEC_CHUNK_LEN;
-  vOffset integer := 1;
   vResult clob;
 begin
   case
@@ -164,11 +176,11 @@ end;
 
 function DecodeToBlob(pIP clob) return blob is
 -- Decodes a Base64 encoded clob into a blob
+  vOffset integer := 1;
   vLen pls_integer := coalesce(dbms_lob.getlength(pIP), 0);
   vBufferRaw raw(32767);
   vBufferVarchar2 varchar2(32767 byte);
   vBufferSize integer := MAX_DEC_CHUNK_LEN;
-  vOffset integer := 1;
   vResult blob;
 begin
   case
@@ -191,11 +203,11 @@ end;
 
 procedure DecodeToFile(pIP clob, pOraDir varchar2, pFilename varchar2) is
 -- Decodes a Base64 encoded clob, saving it into a file in the Oracle directory
+  vOffset integer := 1;
   vLen pls_integer;
   vFile utl_file.file_type;
   vBuffer varchar2(32767);
   vBufferSize integer := MAX_DEC_CHUNK_LEN;
-  vOffset integer := 1;
 begin
   vFile := utl_file.fopen(pOraDir, pFilename, 'wb', 32767);
   vLen  := dbms_lob.getlength(pIP);

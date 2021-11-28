@@ -1,6 +1,6 @@
 -- A test script, which validates the operations of the P_Base64 package
--- Tests here work by encoding and reversing that by decoding and comparing back to the original input  
-declare 
+-- Tests here work by encoding and reversing that by decoding and comparing back to the original input
+declare
   vOraDir    varchar2(30) := 'PAULZIP_DIR';    -- This will be your Oracle directory
   vFileName  varchar2(30) := 'B64Test1.txt';
   vFileName2 varchar2(40) := 'B64Test2.txt';
@@ -156,25 +156,25 @@ declare
       vErrors := vErrors + 1;
     end if;
   end;
-  procedure CheckStr(pIP varchar2) is
+  procedure CheckStr(pIP varchar2, pLineSeparators integer) is
   begin
-    Assert(ValuesSame(pIP, P_Base64.DecodeToString(P_Base64.EncodeString(pIP))), 'varchar2 '||length(pIP));
+    Assert(ValuesSame(pIP, P_Base64.DecodeToString(P_Base64.EncodeString(pIP, pLineSeparators))), 'varchar2 '||length(pIP)||', pLineSeparators = '||pLineSeparators);
   end;
-  procedure CheckClob(pIP clob) is
+  procedure CheckClob(pIP clob, pLineSeparators integer) is
   begin
-    Assert(ValuesSame(pIP, P_Base64.DecodeToClob(P_Base64.EncodeClob(pIP))), 'Clob '||case when pIP is null then '{null}' else to_char(length(pIP)) || ' chars' end);
+    Assert(ValuesSame(pIP, P_Base64.DecodeToClob(P_Base64.EncodeClob(pIP, pLineSeparators))), 'Clob '||case when pIP is null then '{null}' else to_char(length(pIP)) || ' chars' end||', pLineSeparators = '||pLineSeparators);
   end;
-  procedure CheckBlob(pIP blob) is
+  procedure CheckBlob(pIP blob, pLineSeparators integer) is
   begin
-    Assert(ValuesSame(pIP, P_Base64.DecodeToBlob(P_Base64.EncodeBlob(pIP))), 'Blob '||case when pIP is null then '{null}' else to_char(length(pIP)) || ' bytes' end);
+    Assert(ValuesSame(pIP, P_Base64.DecodeToBlob(P_Base64.EncodeBlob(pIP, pLineSeparators))), 'Blob '||case when pIP is null then '{null}' else to_char(length(pIP)) || ' bytes' end||', pLineSeparators = '||pLineSeparators);
   end;
-  procedure CheckFile(pIP blob) is
+  procedure CheckFile(pIP blob, pLineSeparators integer) is
   begin
     WriteBlob(vOraDir, vFileName, pIP, 'WB'); -- Write blob to file
-    P_Base64.DecodeToFile(P_Base64.EncodeFile(vOraDir, vFileName), vOraDir, vFileName2); -- Encode file to Base64 and decode it another file
-    Assert(ValuesSame(FileHash(vOraDir, vFileName), FileHash(vOraDir, vFileName2)), 'File '||case when pIP is null then '{null}' else to_char(length(pIP)) || ' bytes' end);  -- Compare file hashes
+    P_Base64.DecodeToFile(P_Base64.EncodeFile(vOraDir, vFileName, pLineSeparators), vOraDir, vFileName2); -- Encode file to Base64 and decode it another file
+    Assert(ValuesSame(FileHash(vOraDir, vFileName), FileHash(vOraDir, vFileName2)), 'File '||case when pIP is null then '{null}' else to_char(length(pIP)) || ' bytes' end||', pLineSeparators = '||pLineSeparators);  -- Compare file hashes
   end;
-  procedure CheckItems(pItemType integer, pMinLen integer, pMaxLen integer, pCount integer default null) is
+  procedure CheckItems(pItemType integer, pMinLen integer, pMaxLen integer, pCount integer default null, pLineSeparators integer) is
     vStart integer := case when pCount is null then pMinLen else 1 end;
     vEnd   integer := coalesce(pCount, pMaxLen);
     vLen   integer;
@@ -183,47 +183,50 @@ declare
     loop
       vLen := case when pCount is null then n else round(dbms_random.value(pMinLen, pMaxLen)) end;
       case pItemType
-        when IT_STR  then CheckStr (GetStrOfLength (vLen));
-        when IT_CLOB then CheckClob(GetClobOfLength(vLen));
-        when IT_BLOB then CheckBlob(GetBlobOfLength(vLen));
-        when IT_FILE then CheckFile(GetBlobOfLength(vLen));
+        when IT_STR  then CheckStr (GetStrOfLength (vLen), pLineSeparators);
+        when IT_CLOB then CheckClob(GetClobOfLength(vLen), pLineSeparators);
+        when IT_BLOB then CheckBlob(GetBlobOfLength(vLen), pLineSeparators);
+        when IT_FILE then CheckFile(GetBlobOfLength(vLen), pLineSeparators);
       end case;
     end loop;
   end;
 begin
---------------------------------------------------------------------------------
--- Varchar2
-  CheckStr(null);
-  CheckStr(GetStrOfLength(1));                                           -- Test lower limit
-  CheckItems(IT_STR, pMinLen => 1, pMaxLen => 23829, pCount => 20);      -- Random sample of 20 strings which encode up to 32k (23829 input => 32KB output)
-  CheckItems(IT_STR, pMinLen => 23819, pMaxLen => 23829);                -- Test lengths up to and including 32k boundary
---------------------------------------------------------------------------------
--- Clob
-  CheckClob(null);
-  CheckClob(empty_clob());
-  CheckClob(GetClobOfLength(1));                                          -- Test lower limit
-  CheckItems(IT_CLOB, pMinLen => 1, pMaxLen => 32767, pCount => 20);      -- Random sample of 20 clobs up to 32k
-  CheckItems(IT_CLOB, pMinLen => 32766, pMaxLen => 32777);                -- Test lengths around 32k boundary to check splicing aspect works
-  CheckItems(IT_CLOB, pMinLen => 100120, pMaxLen => 200120, pCount => 5); -- Test some larger examples, a random sample of 5
---------------------------------------------------------------------------------
--- Blob
-  CheckBlob(null);
-  CheckBlob(empty_blob());
-  CheckBlob(GetBlobOfLength(1));                                          -- Test lower limit
-  CheckItems(IT_BLOB, pMinLen => 1, pMaxLen => 32767, pCount => 20);      -- Random sample of 20 blobs up to 32k
-  CheckItems(IT_BLOB, pMinLen => 32766, pMaxLen => 32777);                -- Test lengths around 32k boundary to check splicing aspect works
-  CheckItems(IT_BLOB, pMinLen => 151234, pMaxLen => 254321, pCount => 5); -- Test some larger examples, random sample of 5
---------------------------------------------------------------------------------
--- Files
-  CheckFile(null);
-  CheckFile(empty_blob());
-  CheckFile(GetBlobOfLength(1));                                          -- Test lower limit
-  CheckItems(IT_FILE, pMinLen => 1, pMaxLen => 32767, pCount => 20);      -- Random sample of 20 files up to 32k
-  CheckItems(IT_FILE, pMinLen => 32766, pMaxLen => 32777);                -- Test lengths around 32k boundary to check splicing aspect works
-  CheckItems(IT_FILE, pMinLen => 278901, pMaxLen => 378901, pCount => 5); -- Test some larger examples, random sample of 5
-  utl_file.fremove (vOraDir, vFileName);
-  utl_file.fremove (vOraDir, vFileName2);
---------------------------------------------------------------------------------
+  for vLineSeparators in 0..1
+  loop
+  --------------------------------------------------------------------------------
+  -- Varchar2
+    CheckStr(null, vLineSeparators);
+    CheckStr(GetStrOfLength(1), vLineSeparators);                                                              -- Test lower limit
+    CheckItems(IT_STR, pMinLen => 1, pMaxLen => 23829, pCount => 20, pLineSeparators => vLineSeparators);      -- Random sample of 20 strings which encode up to 32k (23829 input => 32KB output)
+    CheckItems(IT_STR, pMinLen => 23819, pMaxLen => 23829, pLineSeparators => vLineSeparators);                -- Test lengths up to and including 32k boundary
+  --------------------------------------------------------------------------------
+  -- Clob
+    CheckClob(null, vLineSeparators);
+    CheckClob(empty_clob(), vLineSeparators);
+    CheckClob(GetClobOfLength(1), vLineSeparators);                                                             -- Test lower limit
+    CheckItems(IT_CLOB, pMinLen => 1, pMaxLen => 32767, pCount => 20, pLineSeparators => vLineSeparators);      -- Random sample of 20 clobs up to 32k
+    CheckItems(IT_CLOB, pMinLen => 32766, pMaxLen => 32777, pLineSeparators => vLineSeparators);                -- Test lengths around 32k boundary to check splicing aspect works
+    CheckItems(IT_CLOB, pMinLen => 100120, pMaxLen => 200120, pCount => 5, pLineSeparators => vLineSeparators); -- Test some larger examples, a random sample of 5
+  --------------------------------------------------------------------------------
+  -- Blob
+    CheckBlob(null, vLineSeparators);
+    CheckBlob(empty_blob(), vLineSeparators);
+    CheckBlob(GetBlobOfLength(1), vLineSeparators);                                                             -- Test lower limit
+    CheckItems(IT_BLOB, pMinLen => 1, pMaxLen => 32767, pCount => 20, pLineSeparators => vLineSeparators);      -- Random sample of 20 blobs up to 32k
+    CheckItems(IT_BLOB, pMinLen => 32766, pMaxLen => 32777, pLineSeparators => vLineSeparators);                -- Test lengths around 32k boundary to check splicing aspect works
+    CheckItems(IT_BLOB, pMinLen => 151234, pMaxLen => 254321, pCount => 5, pLineSeparators => vLineSeparators); -- Test some larger examples, random sample of 5
+  --------------------------------------------------------------------------------
+  -- Files
+    CheckFile(null, vLineSeparators);
+    CheckFile(empty_blob(), vLineSeparators);
+    CheckFile(GetBlobOfLength(1), vLineSeparators);                                                             -- Test lower limit
+    CheckItems(IT_FILE, pMinLen => 1, pMaxLen => 32767, pCount => 20, pLineSeparators => vLineSeparators);      -- Random sample of 20 files up to 32k
+    CheckItems(IT_FILE, pMinLen => 32766, pMaxLen => 32777, pLineSeparators => vLineSeparators);                -- Test lengths around 32k boundary to check splicing aspect works
+    CheckItems(IT_FILE, pMinLen => 278901, pMaxLen => 378901, pCount => 5, pLineSeparators => vLineSeparators); -- Test some larger examples, random sample of 5
+    utl_file.fremove (vOraDir, vFileName);
+    utl_file.fremove (vOraDir, vFileName2);
+  --------------------------------------------------------------------------------
+  end loop;
   if vErrors > 0 then
     raise_application_error(-20001, 'Errors found = '||vErrors);
   end if;
