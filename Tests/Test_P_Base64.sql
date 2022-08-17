@@ -60,68 +60,6 @@ declare
     end if;
     return case when pLen = 0 then empty_clob() else vResult end;
   end;
-  procedure WriteBlob(pDirectory       in varchar2,
-                      pFilename        in varchar2,
-                      pBlob            in blob,
-                      pFileWriteAction in varchar2 default 'WB') is
-    vDestFile utl_file.file_type;
-    vPos      number := 1;
-    vAmount   binary_integer := 32767;
-    vBlobLen  number;
-    vBuffer   raw(32767);
-  begin
-    vDestFile := utl_file.fopen(pDirectory, pFilename,  pFileWriteAction, 32767);
-    vBlobLen := dbms_lob.getlength(pBlob);
-    while vPos < vBlobLen
-    loop
-      dbms_lob.read(pBlob, vAmount, vPos, vBuffer);
-      utl_file.put_raw(vDestFile, vBuffer, true);
-      vPos := vPos + vAmount;
-    end loop;
-    utl_file.fclose(vDestFile);
-  exception
-    when OTHERS then
-      if utl_file.is_open(vDestFile) then
-        utl_file.fclose(vDestFile);
-      end if;
-      raise;
-  end;
-  function ReadBlob(pDirectory in varchar2,
-                    pFilename  in varchar2) return blob is
-    vDestOffset  integer := 1;
-    vSrcOffset   integer := 1;
-    vBFile    bfile;
-    vBlob     blob;
-    function FileLength return pls_integer is
-      vExists     boolean;
-      vFileLength number;
-      vBlocksize  binary_integer;
-    begin
-      UTL_FILE.FGETATTR(pDirectory, pFilename, vExists, vFileLength, vBlocksize);
-      return vFileLength;
-    end;
-  begin
-    if nvl(FileLength, 0) > 0 then
-      vBFile := BFilename(pDirectory, pFileName);
-      begin
-        DBMS_LOB.FileOpen(vBFile, dbms_lob.file_readonly);
-        DBMS_LOB.CreateTemporary(vBlob, true, dbms_lob.call);
-        DBMS_LOB.LoadBlobFromFile(vBlob,
-                                  vBFile,
-                                  dbms_lob.lobmaxsize,
-                                  vDestOffset,
-                                  vSrcOffset);
-        DBMS_LOB.FileClose(vBFile);
-      exception
-        when OTHERS then
-          if DBMS_LOB.FileIsOpen(vBFile) = 1 then
-            DBMS_LOB.FileClose(vBFile);
-          end if;
-          raise;
-      end;
-    end if;
-    return vBlob;
-  end;
   function FileHash(pOracleDir in varchar2, pFilename in varchar2, pHashFunction PLS_Integer default 2 /* MD5 */) return varchar2 is
   -- Returns the hash of a file, which can be used to identify uniqueness
   -- pHashFunction is one of DBMS_CRYPTO hash function constants
@@ -129,7 +67,7 @@ declare
     vBlob blob;
     vHash raw(64); -- Max hash length from DBMS_CRYPTO currently 512 bits = 64 bytes
   begin
-    vBlob := ReadBlob(pOracleDir, pFilename);
+    vBlob := P_Base64.FileToBlob(pOracleDir, pFilename);
     vHash := DBMS_Crypto.Hash(coalesce(vBlob, Empty_Blob()), pHashFunction); -- Null blob is not allowed, empty blob is
     return RawToHex(vHash);
   end;
@@ -170,7 +108,7 @@ declare
   end;
   procedure CheckFile(pIP blob, pLineSeparators integer) is
   begin
-    WriteBlob(vOraDir, vFileName, pIP, 'WB'); -- Write blob to file
+    P_Base64.BlobToFile(pIP, vOraDir, vFileName); -- Write blob to file
     P_Base64.DecodeToFile(P_Base64.EncodeFile(vOraDir, vFileName, pLineSeparators), vOraDir, vFileName2); -- Encode file to Base64 and decode it another file
     Assert(ValuesSame(FileHash(vOraDir, vFileName), FileHash(vOraDir, vFileName2)), 'File '||case when pIP is null then '{null}' else to_char(length(pIP)) || ' bytes' end||', pLineSeparators = '||pLineSeparators);  -- Compare file hashes
   end;
@@ -195,12 +133,14 @@ begin
   loop
   --------------------------------------------------------------------------------
   -- Varchar2
+    dbms_output.put_line('--- Varchar2 Tests ---');
     CheckStr(null, vLineSeparators);
     CheckStr(GetStrOfLength(1), vLineSeparators);                                                              -- Test lower limit
     CheckItems(IT_STR, pMinLen => 1, pMaxLen => 23829, pCount => 20, pLineSeparators => vLineSeparators);      -- Random sample of 20 strings which encode up to 32k (23829 input => 32KB output)
     CheckItems(IT_STR, pMinLen => 23819, pMaxLen => 23829, pLineSeparators => vLineSeparators);                -- Test lengths up to and including 32k boundary
   --------------------------------------------------------------------------------
   -- Clob
+    dbms_output.put_line('--- Clob Tests ---');
     CheckClob(null, vLineSeparators);
     CheckClob(empty_clob(), vLineSeparators);
     CheckClob(GetClobOfLength(1), vLineSeparators);                                                             -- Test lower limit
@@ -209,6 +149,7 @@ begin
     CheckItems(IT_CLOB, pMinLen => 100120, pMaxLen => 200120, pCount => 5, pLineSeparators => vLineSeparators); -- Test some larger examples, a random sample of 5
   --------------------------------------------------------------------------------
   -- Blob
+    dbms_output.put_line('--- Blob Tests ---');
     CheckBlob(null, vLineSeparators);
     CheckBlob(empty_blob(), vLineSeparators);
     CheckBlob(GetBlobOfLength(1), vLineSeparators);                                                             -- Test lower limit
@@ -217,6 +158,7 @@ begin
     CheckItems(IT_BLOB, pMinLen => 151234, pMaxLen => 254321, pCount => 5, pLineSeparators => vLineSeparators); -- Test some larger examples, random sample of 5
   --------------------------------------------------------------------------------
   -- Files
+    dbms_output.put_line('--- File Tests ---');
     CheckFile(null, vLineSeparators);
     CheckFile(empty_blob(), vLineSeparators);
     CheckFile(GetBlobOfLength(1), vLineSeparators);                                                             -- Test lower limit
